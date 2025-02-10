@@ -1,4 +1,5 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local ESX = nil
+TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 local PlayerWorkVans = {}
 local PlayerDeliveryVehicles = {}
 local waypointCoords = vector3(-603.707, 5305.513, 70.331)
@@ -26,13 +27,18 @@ TrailerFull = false
 TaskInProgress = false
 IsDeliveryTruckSelected = false
 
--- Notification function to handle both qbcore and ox notification systems
+-- Notification function to handle ox notification systems
 function NotifyPlayer(message, type)
-    if Config.notification == "qbcore" then
-        QBCore.Functions.Notify(message, type, 5000)
-    elseif Config.notification == "ox" then
-        lib.notify({ title = message, type = type })
-    end
+    lib.notify({
+        id = 'notification_' .. GetPlayerServerId(PlayerId()),
+        title = 'Notification',
+        description = message,
+        showDuration = false,
+        position = 'top',
+        style = { backgroundColor = '#141517', color = '#C1C2C5', ['.description'] = { color = '#909296' } },
+        icon = 'ban',
+        iconColor = '#C53030'
+    })
 end
 
 -- Depo Vehicles
@@ -41,9 +47,9 @@ RegisterNetEvent('tr-lumberjack:client:deliverytruck', function()
     local trailer = Config.deliveryTrailer
     local coords = Config.deliverySpawn
     local player = PlayerPedId()
-    local playerData = QBCore.Functions.GetPlayerData()
-    local citizenid = playerData.citizenid
-    local lastname = playerData.charinfo.lastname
+    local playerData = ESX.GetPlayerData()
+    local citizenid = playerData.identifier
+    local lastname = playerData.lastName
 
     local function GeneratePlate()
         return "TRLUM" .. math.random(100, 999)
@@ -102,11 +108,7 @@ RegisterNetEvent('tr-lumberjack:client:deliverytruck', function()
             "Hello %s,\n\nYour delivery truck License Plate (%s) and flatbed trailer License Plate (%s) have been successfully loaned. Please proceed to the lumbermill in Paleto for your next task.\n\nThank you!",
             lastname, truckPlate, trailerPlate
         )
-        TriggerServerEvent('qb-phone:server:sendNewMail', {
-            sender = Lang.interact1,
-            subject = Lang.depoInvoice,
-            message = depoMessage
-        })
+        TriggerServerEvent('esx_phone:send', 'Lumberjack', depoMessage, false, false)
     end
 end)
 
@@ -115,11 +117,11 @@ RegisterNetEvent('tr-lumberjack:client:workvan', function()
     local trailer = Config.WorkVanTrailer
     local coords = Config.lumberVan
     local player = PlayerPedId()
-    local playerData = QBCore.Functions.GetPlayerData()
-    local playerId = playerData.citizenid
-    local lastname = playerData.charinfo.lastname
+    local playerData = ESX.GetPlayerData()
+    local playerId = playerData.identifier
+    local lastname = playerData.lastName
     local workVanPrice = Config.workVanPrice
-    local cash = playerData.money['cash']
+    local cash = playerData.money
 
     local function GeneratePlate()
         local randomNum = math.random(100, 999)
@@ -195,11 +197,7 @@ RegisterNetEvent('tr-lumberjack:client:workvan', function()
             trailerPlate,
             workVanPrice
         )
-        TriggerServerEvent('qb-phone:server:sendNewMail', {
-            sender = Lang.interact1,
-            subject = Lang.depoInvoice,
-            message = depoMessage,
-        })
+        TriggerServerEvent('esx_phone:send', 'Lumberjack', depoMessage, false, false)
     end
 end)
 
@@ -213,7 +211,7 @@ RegisterNetEvent('tr-lumberjack:client:returnworkvan', function()
     end
 
     local plate = GetVehicleNumberPlateText(vehicle)
-    local playerId = QBCore.Functions.GetPlayerData().citizenid
+    local playerId = ESX.GetPlayerData().identifier
 
     if PlayerWorkVans[playerId] and PlayerWorkVans[playerId][plate] then
         local playerData = PlayerWorkVans[playerId][plate]
@@ -237,8 +235,8 @@ end)
 
 RegisterNetEvent('tr-lumberjack:client:returndeliverytruck', function()
     local playerPed = PlayerPedId()
-    local playerData = QBCore.Functions.GetPlayerData()
-    local citizenid = playerData.citizenid
+    local playerData = ESX.GetPlayerData()
+    local citizenid = playerData.identifier
 
     if not PlayerDeliveryVehicles[citizenid] then
         NotifyPlayer(Lang.noDeliveryVehicle, 'error')
@@ -393,32 +391,13 @@ RegisterNetEvent('tr-lumberjack:client:loginteract', function()
     if HasPlayerGotLog() then
         StartCarryingLog(playerPed)
     else
-        if Config.progress == "qbcore" then
-            QBCore.Functions.Progressbar('Picking up Log', Lang.pickingLog, Config.progressTime.collectLog * 1000, false, true, {
-                disableMovement = true,
-                disableCarMovement = true,
-                disableMouse = false,
-                disableCombat = true
-            }, {
-                animDict = "amb@world_human_gardener_plant@male@base",
-                anim = "base",
-                flags = 16,
-            }, {}, {}, function()
-                ClearPedTasks(PlayerPedId())
-                Wait(7)
-                StartCarryingLog(playerPed)
-                Wait(7)
-                TriggerServerEvent('tr-lumberjack:server:addLog')
-            end, function()
-                ClearPedTasks(PlayerPedId())
-            end)
-        elseif Config.progress == "ox" then
+        if Config.progress == "ox" then
             if lib.progressBar({
                 duration = Config.progressTime.collectLog * 1000,
                 label = Lang.pickingLog,
                 useWhileDead = false,
                 canCancel = true,
-                disable = { move = true }
+                disable = { move = true, mouse = false, combat = true }
             }) then
                 ClearPedTasks(PlayerPedId())
                 Wait(7)
@@ -579,25 +558,13 @@ RegisterNetEvent('tr-lumberjack:client:loadtrailer', function()
         return
     end
 
-    if Config.progress == "qbcore" then
-        QBCore.Functions.Progressbar('Loading Trailer', Lang.loadingTrailer, Config.progressTime.loadTruck_unload * 1000, false, true, {
-            disableMovement = true,
-            disableCarMovement = true,
-            disableMouse = false,
-            disableCombat = true
-        }, {}, {}, {}, function()
-            loadLogOntoTrailer(trailer, trailerBone, nextPositionID, playerPed)
-            checkTrailerFull()
-        end, function()
-            NotifyPlayer(Lang.cancelledProgress, 'error')
-        end)
-    elseif Config.progress == "ox" then
+    if Config.progress == "ox" then
         if lib.progressBar({
             duration = Config.progressTime.loadTruck_unload * 1000,
             label = Lang.loadingTrailer,
             useWhileDead = false,
             canCancel = true,
-            disable = { move = true }
+            disable = { move = true, mouse = false, combat = true }
         }) then
             loadLogOntoTrailer(trailer, trailerBone, nextPositionID, playerPed)
             checkTrailerFull()
@@ -617,25 +584,13 @@ RegisterNetEvent('tr-lumberjack:client:unloadtrailer', function()
             return
         end
 
-        if Config.progress == "qbcore" then
-            QBCore.Functions.Progressbar('Unloading Trailer', Lang.unloadingTrailer, Config.progressTime.loadTruck_unload * 1000, false, true, {
-                disableMovement = true,
-                disableCarMovement = true,
-                disableMouse = false,
-                disableCombat = true
-            }, {}, {}, {}, function()
-                trailer = nearbyTrailers[1]
-                unloadLogFromTrailer(trailer, playerPed)
-            end, function()
-                NotifyPlayer(Lang.cancelledProgress, 'error')
-            end)
-        elseif Config.progress == "ox" then
+        if Config.progress == "ox" then
             if lib.progressBar({
                 duration = Config.progressTime.loadTruck_unload * 1000,
                 label = Lang.unloadingTrailer,
                 useWhileDead = false,
                 canCancel = true,
-                disable = { move = true }
+                disable = { move = true, mouse = false, combat = true }
             }) then
                 trailer = nearbyTrailers[1]
                 unloadLogFromTrailer(trailer, playerPed)
@@ -695,25 +650,13 @@ end
 -- Selling at the docks
 RegisterNetEvent('tr-lumberjack:client:logselling', function()
     if HasPlayerGotLog() and timmyTaskStarted then
-        if Config.progress == "qbcore" then
-            QBCore.Functions.Progressbar('Selling Log', Lang.sellingLog, Config.progressTime.sellingLog * 1000, false, true, {
-                disableMovement = true,
-                disableCarMovement = true,
-                disableMouse = false,
-                disableCombat = true
-            }, {}, {}, {}, function()
-                DetachAndDeleteLogProp()
-                TriggerServerEvent('tr-lumberjack:server:sellinglog')
-            end, function()
-                NotifyPlayer(Lang.cancelledProgress, 'error')
-            end)
-        elseif Config.progress == "ox" then
+        if Config.progress == "ox" then
             if lib.progressBar({
                 duration = Config.progressTime.sellingLog * 1000,
                 label = Lang.sellingLog,
                 useWhileDead = false,
                 canCancel = true,
-                disable = { move = true }
+                disable = { move = true, mouse = false, combat = true }
             }) then
                 DetachAndDeleteLogProp()
                 TriggerServerEvent('tr-lumberjack:server:sellinglog')
@@ -791,27 +734,13 @@ RegisterNetEvent('tr-lumberjack:client:choptreecheck', function()
 
     TaskPlayAnim(playerPed, choppingAnimation.dict, choppingAnimation.name, 8.0, -8.0, -1, 1, 0, false, false, false)
 
-    if Config.progress == "qbcore" then
-        QBCore.Functions.Progressbar('chopping_tree', Lang.choppingDownTree, Config.progressTime.chopping * 1000, false, true, {
-            disableMovement = true,
-            disableCarMovement = true,
-            disableMouse = false,
-            disableCombat = true
-        }, {}, {}, {}, function()
-            ClearPedTasks(playerPed)
-            TriggerServerEvent('tr-lumberjack:server:choptree')
-        end, function()
-            ClearPedTasks(playerPed)
-            NotifyPlayer(Lang.cancelledProgress, 'error')
-        end)
-
-    elseif Config.progress == "ox" then
+    if Config.progress == "ox" then
         if lib.progressBar({
             duration = Config.progressTime.chopping * 1000,
             label = Lang.choppingDownTree,
             useWhileDead = false,
             canCancel = true,
-            disable = { move = true }
+            disable = { move = true, mouse = false, combat = true }
         }) then
             ClearPedTasks(playerPed)
             TriggerServerEvent('tr-lumberjack:server:choptree')
@@ -839,56 +768,7 @@ RegisterNetEvent('tr-lumberjack:client:craftinginput', function(args)
         return
     end
 
-    if Config.menu == "qbcore" then
-        local dialog = exports['qb-input']:ShowInput({
-            header = string.format(Lang.choppedLogAmount, ChoppedLogs),
-            submitText = Lang.submit,
-            inputs = {
-                {
-                    text = Lang.menuText,
-                    name = "loginput",
-                    type = "number",
-                    isRequired = true,
-                },
-            },
-        })
-
-        if dialog then
-            local logAmount = tonumber(dialog.loginput)
-            if logAmount and (logAmount < 0 or logAmount > ChoppedLogs) then
-                NotifyPlayer(Lang.invalidNumber, 'error')
-                return
-            end
-            if Config.progress == "qbcore" then
-                QBCore.Functions.Progressbar('crafting_progress', craftingItemName, Config.progressTime.crafting * 1000 * logAmount, false, true, {
-                    disableMovement = true,
-                    disableCarMovement = true,
-                    disableMouse = false,
-                    disableCombat = true
-                }, {}, {}, {}, function()
-                    TriggerServerEvent('tr-lumberjack:server:craftinginput', argsNumber, logAmount)
-                end, function()
-                    NotifyPlayer(Lang.cancelledProgress, 'error')
-                end)
-
-            elseif Config.progress == "ox" then
-                if lib.progressBar({
-                    duration = Config.progressTime.crafting * 1000 * logAmount,
-                    label = craftingItemName,
-                    useWhileDead = false,
-                    canCancel = true,
-                    disable = { move = true }
-                }) then
-                    TriggerServerEvent('tr-lumberjack:server:craftinginput', argsNumber, logAmount)
-                else
-                    NotifyPlayer(Lang.cancelledProgress, 'error')
-                end
-            end
-        else
-            return
-        end
-
-    elseif Config.menu == "ox" then
+    if Config.menu == "ox" then
         local input = lib.inputDialog(string.format(Lang.choppedLogAmount, ChoppedLogs), {
             {type = 'number', label = Lang.menuText, icon = 'hashtag'}
         })
@@ -899,30 +779,16 @@ RegisterNetEvent('tr-lumberjack:client:craftinginput', function(args)
                 NotifyPlayer(Lang.invalidNumber, 'error')
                 return
             end
-            if Config.progress == "qbcore" then
-                QBCore.Functions.Progressbar('crafting_progress', craftingItemName, Config.progressTime.crafting * 1000 * logAmount, false, true, {
-                    disableMovement = true,
-                    disableCarMovement = true,
-                    disableMouse = false,
-                    disableCombat = true
-                }, {}, {}, {}, function()
-                    TriggerServerEvent('tr-lumberjack:server:craftinginput', argsNumber, logAmount)
-                end, function()
-                    NotifyPlayer(Lang.cancelledProgress, 'error')
-                end)
-
-            elseif Config.progress == "ox" then
-                if lib.progressBar({
-                    duration = Config.progressTime.crafting * 1000 * logAmount,
-                    label = craftingItemName,
-                    useWhileDead = false,
-                    canCancel = true,
-                    disable = { move = true }
-                }) then
-                    TriggerServerEvent('tr-lumberjack:server:craftinginput', argsNumber, logAmount)
-                else
-                    NotifyPlayer(Lang.cancelledProgress, 'error')
-                end
+            if lib.progressBar({
+                duration = Config.progressTime.crafting * 1000 * logAmount,
+                label = craftingItemName,
+                useWhileDead = false,
+                canCancel = true,
+                disable = { move = true, mouse = false, combat = true }
+            }) then
+                TriggerServerEvent('tr-lumberjack:server:craftinginput', argsNumber, logAmount)
+            else
+                NotifyPlayer(Lang.cancelledProgress, 'error')
             end
         else
             return
