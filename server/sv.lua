@@ -1,28 +1,35 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local ESX = nil
+TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 local playerLogSales = {}
 
 local function notifyPlayer(source, message, type)
-    if Config.notification == "qbcore" then
-        TriggerClientEvent('QBCore:Notify', source, message, type)
-    elseif Config.notification == "ox" then
-        TriggerClientEvent('ox_lib:notify', source, { type = type, description = message })
-    end
+    lib.notify({
+        id = 'notification_' .. source,
+        title = 'Notification',
+        description = message,
+        showDuration = false,
+        position = 'top',
+        style = { backgroundColor = '#141517', color = '#C1C2C5', ['.description'] = { color = '#909296' } },
+        icon = 'ban',
+        iconColor = '#C53030'
+    })
 end
 
 RegisterServerEvent('tr-lumberjack:server:workvan', function(workVanPrice)
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
 
-    if Player and exports.ox_inventory:RemoveItem(source, 'cash', workVanPrice) then
+    if xPlayer and xPlayer.getMoney() >= workVanPrice then
+        xPlayer.removeMoney(workVanPrice)
         notifyPlayer(source, string.format(Lang.paidWorkVan, workVanPrice), 'success')
     end
 end)
 
 RegisterServerEvent('tr-lumberjack:server:returnworkvan', function()
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
 
-    if Player then
+    if xPlayer then
         local playerCoords = GetEntityCoords(GetPlayerPed(source))
         local depoCoords = vector3(Config.lumberDepo.x, Config.lumberDepo.y, Config.lumberDepo.z)
 
@@ -30,11 +37,8 @@ RegisterServerEvent('tr-lumberjack:server:returnworkvan', function()
             notifyPlayer(source, Lang.tooFarFromDepo, 'error')
             return
         end
-        if exports.ox_inventory:AddItem(source, 'cash', Config.returnPrice) then
-            notifyPlayer(source, Lang.storedVehicle, 'success')
-        else
-            notifyPlayer(source, Lang.incorrectVehicle, 'error')
-        end
+        xPlayer.addMoney(Config.returnPrice)
+        notifyPlayer(source, Lang.storedVehicle, 'success')
     else
         notifyPlayer(source, Lang.invalidPlayer, 'error')
     end
@@ -42,33 +46,33 @@ end)
 
 RegisterServerEvent('tr-lumberjack:server:addLog', function()
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
 
-    local logCount = Player.Functions.GetItemByName('tr_log')
+    local logCount = xPlayer.getInventoryItem('tr_log').count
 
-    if logCount then
+    if logCount > 0 then
         notifyPlayer(source, Lang.carryingItem, 'error')
         return
     end
 
-    exports.ox_inventory:AddItem(source, 'tr_log', 1)
+    xPlayer.addInventoryItem('tr_log', 1)
     notifyPlayer(source, Lang.addedLog, 'success')
 end)
 
 RegisterServerEvent('tr-lumberjack:server:removeLog', function()
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
 
-    if Player then
-        exports.ox_inventory:RemoveItem(source, 'tr_log', 1)
+    if xPlayer then
+        xPlayer.removeInventoryItem('tr_log', 1)
     end
 end)
 
 RegisterServerEvent('tr-lumberjack:server:deliverypaper', function()
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
 
-    if Player then
+    if xPlayer then
         local playerCoords = GetEntityCoords(GetPlayerPed(source))
         local taskerCoords = vector3(Config.deliveryTasker.x, Config.deliveryTasker.y, Config.deliveryTasker.z)
 
@@ -77,27 +81,23 @@ RegisterServerEvent('tr-lumberjack:server:deliverypaper', function()
             return
         end
 
-        if exports.ox_inventory:Search(source, 'count', 'tr_deliverypaper') > 0 then
+        if xPlayer.getInventoryItem('tr_deliverypaper').count > 0 then
             notifyPlayer(source, Lang.alreadyHaveDeliveryPaper, 'error')
             return
         end
 
-        if exports.ox_inventory:AddItem(source, 'tr_deliverypaper', 1) then
-            notifyPlayer(source, Lang.timmyDialLog1, 'success')
-        else
-            notifyPlayer(source, Lang.deliveryPaperFailed, 'error')
-        end
+        xPlayer.addInventoryItem('tr_deliverypaper', 1)
+        notifyPlayer(source, Lang.timmyDialLog1, 'success')
     else
         notifyPlayer(source, Lang.invalidPlayer, 'error')
     end
 end)
 
-
 RegisterServerEvent('tr-lumberjack:server:sellinglog', function()
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
 
-    if Player then
+    if xPlayer then
         local playerCoords = GetEntityCoords(GetPlayerPed(source))
         local dropOffCoords = Config.deliverDropOff
 
@@ -106,7 +106,7 @@ RegisterServerEvent('tr-lumberjack:server:sellinglog', function()
             return
         end
 
-        if exports.ox_inventory:Search(source, 'count', 'tr_log') < 1 then
+        if xPlayer.getInventoryItem('tr_log').count < 1 then
             notifyPlayer(source, Lang.noLogsToSell, 'error')
             return
         end
@@ -119,32 +119,27 @@ RegisterServerEvent('tr-lumberjack:server:sellinglog', function()
         end
         playerLogSales[source] = playerLogSales[source] + 1
 
-        if exports.ox_inventory:RemoveItem(source, 'tr_log', 1) then
-            exports.ox_inventory:AddItem(source, 'cash', cashReward)
+        xPlayer.removeInventoryItem('tr_log', 1)
+        xPlayer.addMoney(cashReward)
 
-            if playerLogSales[source] >= Config.maxLogs then
-                if exports.ox_inventory:RemoveItem(source, 'tr_deliverypaper', 1) then
-                    TriggerClientEvent('tr-lumberjack:client:resetTimmyTask', source)
-                end
-                playerLogSales[source] = 0
-            end
-            notifyPlayer(source, string.format(Lang.soldLog, cashReward), 'success')
-        else
-            notifyPlayer(source, Lang.logRemovalFailed, 'error')
+        if playerLogSales[source] >= Config.maxLogs then
+            xPlayer.removeInventoryItem('tr_deliverypaper', 1)
+            TriggerClientEvent('tr-lumberjack:client:resetTimmyTask', source)
+            playerLogSales[source] = 0
         end
+        notifyPlayer(source, string.format(Lang.soldLog, cashReward), 'success')
     else
         notifyPlayer(source, Lang.invalidPlayer, 'error')
     end
 end)
 
-
 RegisterServerEvent('tr-lumberjack:server:choptree', function()
     local source = source
-    -- Because you are going to be able to carry till your inventory is full (Don't ask why because Im stupid alright)
-    if exports.ox_inventory:CanCarryItem(source, 'tr_choppedlog', 1) then
-        if exports.ox_inventory:AddItem(source, 'tr_choppedlog', 1) then
-            notifyPlayer(source, Lang.chopAdded, 'success')
-        end
+    local xPlayer = ESX.GetPlayerFromId(source)
+
+    if xPlayer.canCarryItem('tr_choppedlog', 1) then
+        xPlayer.addInventoryItem('tr_choppedlog', 1)
+        notifyPlayer(source, Lang.chopAdded, 'success')
     else
         notifyPlayer(source, Lang.carryingWeight, 'error')
     end
@@ -194,14 +189,11 @@ RegisterServerEvent('tr-lumberjack:server:craftinginput', function(argsNumber, l
         return
     end
 
-    if exports.ox_inventory:CanCarryItem(source, itemToReceive, totalItems) then
-        if exports.ox_inventory:RemoveItem(source, 'tr_choppedlog', itemCount) then
-            Wait(7)
-            exports.ox_inventory:AddItem(source, itemToReceive, totalItems)
-            notifyPlayer(source, string.format(Lang.craftedItems, totalItems, itemToReceive), 'success')
-        else
-            notifyPlayer(source, Lang.noItemsToCraft, 'error')
-        end
+    if xPlayer.canCarryItem(itemToReceive, totalItems) then
+        xPlayer.removeInventoryItem('tr_choppedlog', itemCount)
+        Wait(7)
+        xPlayer.addInventoryItem(itemToReceive, totalItems)
+        notifyPlayer(source, string.format(Lang.craftedItems, totalItems, itemToReceive), 'success')
     else
         notifyPlayer(source, Lang.carryingWeight, 'error')
     end
@@ -210,7 +202,6 @@ RegisterServerEvent('tr-lumberjack:server:craftinginput', function(argsNumber, l
         print(string.format("Player %d crafted %d %s.", source, totalItems, itemToReceive))
     end
 end)
-
 
 RegisterServerEvent('tr-lumberjack:server:sellitem', function(args)
     local source = source
@@ -238,9 +229,9 @@ RegisterServerEvent('tr-lumberjack:server:sellitem', function(args)
         local sellPriceRange = Config.sell[itemType]
         if sellPriceRange then
             local sellPrice = math.random(sellPriceRange[1], sellPriceRange[2]) * itemCount
-            if exports.ox_inventory:AddItem(source, 'cash', sellPrice) and exports.ox_inventory:RemoveItem(source, itemType, itemCount) then
-                notifyPlayer(source, string.format(Lang.soldItems, itemCount, sellPrice), 'success')
-            end
+            xPlayer.addMoney(sellPrice)
+            xPlayer.removeInventoryItem(itemType, itemCount)
+            notifyPlayer(source, string.format(Lang.soldItems, itemCount, sellPrice), 'success')
         else
             notifyPlayer(source, Lang.invalidItem, 'error')
         end
