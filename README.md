@@ -8,7 +8,7 @@ International License][cc-by-nc-sa].
 [cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
 
 # tr-lumberjack (v2 Rewrite)
-LumberJack Script for QBCore/OX
+LumberJack Script for ESX. Credits to the owner for posting this powerful resource open source. I have converted this into ESX. Enjoy
 
 ## About This Resource
 Our resource features a built-in delivery system designed to offer players a seamless and efficient way to earn money without the burden of hard labor. To utilize this feature, simply speak with the contractor, select the Delivery Truck option, and embark on your task.
