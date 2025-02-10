@@ -1,157 +1,7 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+ESX = nil
+TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 -- QBCore Menu Configuration
-if Config.menu == "qbcore" then
-    RegisterNetEvent('tr-lumberjack:client:depo', function()
-        exports['qb-menu']:openMenu({
-            {
-                header = Lang.depo1,
-                icon = 'fa-solid fa-truck',
-                params = {
-                    event = 'tr-lumberjack:client:deliverytruck',
-                }
-            },
-            {
-                header = string.format(Lang.depo2, Config.workVanPrice),
-                icon = 'fa-solid fa-car',
-                params = {
-                    event = 'tr-lumberjack:client:workvan',
-                }
-            },
-            {
-                header = Lang.depo3,
-                icon = 'fa-solid fa-shop',
-                params = {
-                    event = 'tr-lumberjack:client:contractorshop',
-                }
-            },
-            {
-                header = Lang.depo4,
-                icon = 'fa-solid fa-car',
-                params = {
-                    event = 'tr-lumberjack:client:returnworkvan',
-                }
-            },
-            {
-                header = Lang.depo5,
-                icon = 'fa-solid fa-car',
-                params = {
-                    event = 'tr-lumberjack:client:returndeliverytruck',
-                }
-            },
-        })
-    end)
-    RegisterNetEvent('tr-lumberjack:client:trailerInteract', function()
-        exports['qb-menu']:openMenu({
-            {
-                header = Lang.delivery2,
-                icon = 'fa-solid fa-trailer',
-                params = {
-                    event = 'tr-lumberjack:client:loadtrailer',
-                }
-            },
-            {
-                header = Lang.delivery3,
-                icon = 'fa-solid fa-truck',
-                params = {
-                    event = 'tr-lumberjack:client:unloadtrailer',
-                }
-            }
-        })
-    end)
-    RegisterNetEvent('tr-lumberjack:client:crafting', function()
-        if HasPlayerGotChoppedLogs() then
-            exports['qb-menu']:openMenu({
-                {
-                    header = string.format(Lang.craftingMenu, ChoppedLogs),
-                    icon = 'fa-solid fa-tree',
-                },
-                {
-                    header = Lang.craftPlanks,
-                    txt = Lang.craftPlanksAmount,
-                    icon = 'fa-solid fa-gear',
-                    params = {
-                        event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 1,
-                        }
-                    }
-                },
-                {
-                    header = Lang.craftHandles,
-                    txt = Lang.craftHandlesAmount,
-                    icon = 'fa-solid fa-gear',
-                    params = {
-                        event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 2,
-                        }
-                    }
-                },
-                {
-                    header = Lang.craftFirewood,
-                    txt = Lang.craftFirewoodAmount,
-                    icon = 'fa-solid fa-gear',
-                    params = {
-                        event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 3,
-                        }
-                    }
-                },
-                {
-                    header = Lang.craftWoodenToySets,
-                    txt = Lang.craftWoodenToySetsAmount,
-                    icon = 'fa-solid fa-gear',
-                    params = {
-                        event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 4,
-                        }
-                    }
-                }
-            })
-        end
-    end)
-    local function openSellMenu(itemList, eventPrefix)
-        local menuItems = {}
-
-        for _, item in pairs(itemList) do
-            local itemCount = exports.ox_inventory:Search('count', item.name)
-            local itemAvailable = itemCount > 0
-            table.insert(menuItems, {
-                header = string.format(item.header, itemCount),
-                icon = 'fa-solid fa-gear',
-                params = {
-                    event = eventPrefix .. ':server:sellitem',
-                    isServer = true,
-                    args = {
-                        number = itemCount,
-                        itemType = item.name
-                    }
-                },
-                disabled = not itemAvailable
-            })
-        end
-
-        exports['qb-menu']:openMenu(menuItems)
-    end
-    RegisterNetEvent('tr-lumberjack:client:sell1', function()
-        openSellMenu({
-            {name = 'tr_woodplank', header = Lang.sellPlanks},
-            {name = 'tr_firewood', header = Lang.sellFirewood}
-        }, 'tr-lumberjack')
-    end)
-
-    RegisterNetEvent('tr-lumberjack:client:sell2', function()
-        openSellMenu({
-            {name = 'tr_woodhandles', header = Lang.sellHandles},
-            {name = 'tr_toyset', header = Lang.sellToy}
-        }, 'tr-lumberjack')
-    end)
-
-
--- Ox Menu Configuration
-elseif Config.menu == "ox" then
+if Config.menu == "ox" then
     RegisterNetEvent('tr-lumberjack:client:depo', function()
         lib.registerContext({
             id = 'lumberjack_depo',
@@ -160,27 +10,33 @@ elseif Config.menu == "ox" then
                 {
                     title = Lang.depo1,
                     event = 'tr-lumberjack:client:deliverytruck',
+                    icon = 'fa-solid fa-truck'
                 },
                 {
                     title = string.format(Lang.depo2, Config.workVanPrice),
                     event = 'tr-lumberjack:client:workvan',
+                    icon = 'fa-solid fa-car'
                 },
                 {
                     title = Lang.depo3,
                     event = 'tr-lumberjack:client:contractorshop',
+                    icon = 'fa-solid fa-shop'
                 },
                 {
                     title = Lang.depo4,
                     event = 'tr-lumberjack:client:returnworkvan',
+                    icon = 'fa-solid fa-car'
                 },
                 {
                     title = Lang.depo5,
                     event = 'tr-lumberjack:client:returndeliverytruck',
+                    icon = 'fa-solid fa-car'
                 },
             }
         })
         lib.showContext('lumberjack_depo')
     end)
+
     RegisterNetEvent('tr-lumberjack:client:trailerInteract', function()
         lib.registerContext({
             id = 'lumber_trailer',
@@ -189,15 +45,18 @@ elseif Config.menu == "ox" then
                 {
                     title = Lang.delivery2,
                     event = 'tr-lumberjack:client:loadtrailer',
+                    icon = 'fa-solid fa-trailer'
                 },
                 {
                     title = Lang.delivery3,
                     event = 'tr-lumberjack:client:unloadtrailer',
+                    icon = 'fa-solid fa-truck'
                 },
             }
         })
         lib.showContext('lumber_trailer')
     end)
+
     RegisterNetEvent('tr-lumberjack:client:crafting', function()
         if HasPlayerGotChoppedLogs() then
             lib.registerContext({
@@ -208,39 +67,36 @@ elseif Config.menu == "ox" then
                         title = Lang.craftPlanks,
                         description = Lang.craftPlanksAmount,
                         event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 1,
-                        }
+                        args = { number = 1 },
+                        icon = 'fa-solid fa-gear'
                     },
                     {
                         title = Lang.craftHandles,
                         description = Lang.craftHandlesAmount,
                         event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 2,
-                        }
+                        args = { number = 2 },
+                        icon = 'fa-solid fa-gear'
                     },
                     {
                         title = Lang.craftFirewood,
                         description = Lang.craftFirewoodAmount,
                         event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 3,
-                        }
+                        args = { number = 3 },
+                        icon = 'fa-solid fa-gear'
                     },
                     {
                         title = Lang.craftWoodenToySets,
                         description = Lang.craftWoodenToySetsAmount,
                         event = 'tr-lumberjack:client:craftinginput',
-                        args = {
-                            number = 4,
-                        }
+                        args = { number = 4 },
+                        icon = 'fa-solid fa-gear'
                     },
                 }
             })
             lib.showContext('lumberjack_crafting')
         end
     end)
+
     local function openSellMenu(itemList, eventPrefix)
         local menuItems = {}
 
@@ -254,7 +110,8 @@ elseif Config.menu == "ox" then
                     number = itemCount,
                     itemType = item.name
                 },
-                disabled = not itemAvailable -- Disable if no items available
+                disabled = not itemAvailable, -- Disable if no items available
+                icon = 'fa-solid fa-gear'
             })
         end
         lib.registerContext({
@@ -265,12 +122,14 @@ elseif Config.menu == "ox" then
 
         lib.showContext('sell_menu')
     end
+
     RegisterNetEvent('tr-lumberjack:client:sell1', function()
         openSellMenu({
             {name = 'tr_woodplank', header = Lang.sellPlanks},
             {name = 'tr_firewood', header = Lang.sellFirewood}
         }, 'tr-lumberjack')
     end)
+
     RegisterNetEvent('tr-lumberjack:client:sell2', function()
         openSellMenu({
             {name = 'tr_woodhandles', header = Lang.sellHandles},
